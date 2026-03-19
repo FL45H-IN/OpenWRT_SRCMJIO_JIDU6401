@@ -17,11 +17,10 @@ jobs:
 
       - name: Clone OpenWrt (Master)
         run: |
-          # Cloning the official main branch (Snapshot)
           git clone https://github.com/openwrt/openwrt.git
           cd openwrt
           
-          # FIX: Switch from git.openwrt.org (503 error) to GitHub mirrors
+          # Switch from git.openwrt.org to GitHub mirrors
           sed -i 's/git\.openwrt\.org\/feed\/packages\.git/github.com\/openwrt\/packages.git/g' feeds.conf.default
           sed -i 's/git\.openwrt\.org\/project\/luci\.git/github.com\/openwrt\/luci.git/g' feeds.conf.default
           sed -i 's/git\.openwrt\.org\/feed\/routing\.git/github.com\/openwrt\/routing.git/g' feeds.conf.default
@@ -30,18 +29,41 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      - name: Configure Target (MT7986A RFB)
+      - name: Configure Target and Essential Packages
         run: |
           cd openwrt
-          # Setting the Target for MediaTek MT7986A Reference Board (Works for Sercomm 6401)
+          
+          # Target Configuration (MT7986A RFB / Sercomm 6401)
           echo "CONFIG_TARGET_mediatek=y" > .config
           echo "CONFIG_TARGET_mediatek_filogic=y" >> .config
           echo "CONFIG_TARGET_mediatek_filogic_DEVICE_mediatek_mt7986a-rfb=y" >> .config
           
-          # Optional: Add Luci Web Interface so you have a GUI
+          # Web Interface
           echo "CONFIG_PACKAGE_luci=y" >> .config
           
+          # Hardware Offloading & Performance
+          echo "CONFIG_PACKAGE_kmod-nft-offload=y" >> .config
+          echo "CONFIG_PACKAGE_kmod-mt7986-firmware=y" >> .config
+          
+          # Network Segmentation & ODU Communication
+          echo "CONFIG_PACKAGE_kmod-8021q=y" >> .config
+          echo "CONFIG_PACKAGE_kmod-macvlan=y" >> .config
+          
+          # Traffic Manipulation (Prep for DPI Bypass tools like Zapret/ByeDPI)
+          echo "CONFIG_PACKAGE_kmod-nft-tproxy=y" >> .config
+          echo "CONFIG_PACKAGE_kmod-nft-queue=y" >> .config
+          echo "CONFIG_PACKAGE_kmod-tun=y" >> .config
+          
+          # DNS over HTTPS
+          echo "CONFIG_PACKAGE_https-dns-proxy=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-https-dns-proxy=y" >> .config
+
           make defconfig
+
+      - name: Download Package Sources
+        run: |
+          cd openwrt
+          make download -j8
 
       - name: Compile Firmware
         run: |
